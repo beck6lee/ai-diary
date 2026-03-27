@@ -44,6 +44,38 @@
         @input="e => (editedContent = e.target.value)"
       />
 
+      <!-- todos section (idle only, has diary content) -->
+      <div v-if="state === 'idle' && formattedContent" class="today-todos">
+        <!-- header row -->
+        <div class="today-todos__header">
+          <span class="today-todos__title">今日待办</span>
+          <button
+            class="today-todos__gen-btn"
+            :disabled="isGeneratingTodos"
+            @click="handleGenerateTodos"
+          >
+            {{ isGeneratingTodos ? '生成中…' : todos.length ? '重新生成' : '+ 生成待办' }}
+          </button>
+        </div>
+
+        <!-- todo list -->
+        <ul v-if="todos.length" class="today-todos__list">
+          <li
+            v-for="todo in todos"
+            :key="todo.id"
+            class="today-todo-item"
+            :class="{ 'today-todo-item--done': todo.done }"
+            @click="!todo.done && handleToggleTodo(todo.id)"
+          >
+            <span class="today-todo-item__check">
+              <svg v-if="todo.done" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+            </span>
+            <span class="today-todo-item__text">{{ todo.text }}</span>
+            <span v-if="todo.doneAt" class="today-todo-item__time">{{ todo.doneAt }}</span>
+          </li>
+        </ul>
+      </div>
+
       <!-- raw records (collapsible, idle only) -->
       <div v-if="state === 'idle' && rawEntries.length" class="today-raw-section">
         <button class="today-raw-toggle" @click="showRaw = !showRaw">
@@ -100,7 +132,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { marked } from 'marked'
 import { getDiary, saveDiary, getApiKey } from '../utils/storage.js'
-import { streamDiary } from '../utils/deepseek.js'
+import { streamDiary, extractTodos } from '../utils/deepseek.js'
 
 function getToday() {
   return new Date().toLocaleDateString('sv-SE')
@@ -123,6 +155,10 @@ const contentEl = ref(null)
 const cardDimmed = ref(false)
 const showRaw = ref(false)
 
+// todos
+const todos = ref([])
+const isGeneratingTodos = ref(false)
+
 const rawEntries = computed(() =>
   rawAccumulated.value
     ? rawAccumulated.value.split('\n\n---\n\n').filter(s => s.trim())
@@ -141,6 +177,7 @@ onMounted(() => {
   if (existing) {
     rawAccumulated.value = existing.raw || ''
     formattedContent.value = existing.formatted || ''
+    todos.value = existing.todos || []
   }
 })
 
@@ -163,7 +200,58 @@ function handleSaveEdit() {
   state.value = 'idle'
 }
 
-// shared stream runner used by both handleFormat and handleReformat
+// ── Todos ──────────────────────────────────────────────
+
+async function handleGenerateTodos() {
+  const apiKey = getApiKey()
+  if (!apiKey) {
+    error.value = '请先在「设置」页填写 DeepSeek API Key'
+    return
+  }
+  error.value = ''
+  isGeneratingTodos.value = true
+  try {
+    const texts = await extractTodos(formattedContent.value, apiKey)
+    todos.value = texts.map(text => ({
+      id: `${Date.now()}-${Math.random()}`,
+      text,
+      done: false,
+      doneAt: null,
+    }))
+    saveDiary({ date: today, raw: rawAccumulated.value, formatted: formattedContent.value, todos: todos.value })
+  } catch (err) {
+    error.value = `生成待办失败：${err.message}`
+  } finally {
+    isGeneratingTodos.value = false
+  }
+}
+
+function handleToggleTodo(id) {
+  const todo = todos.value.find(t => t.id === id)
+  if (!todo || todo.done) return
+
+  const now = new Date()
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const timeStr = `${hh}:${mm}`
+
+  todo.done = true
+  todo.doneAt = timeStr
+
+  // append completion note to diary
+  const SECTION = '## ✅ 已完成'
+  const line = `- (${timeStr}) ${todo.text}`
+  if (formattedContent.value.includes(SECTION)) {
+    formattedContent.value = formattedContent.value.trimEnd() + `\n${line}`
+  } else {
+    formattedContent.value = formattedContent.value.trimEnd() + `\n\n${SECTION}\n${line}`
+  }
+
+  saveDiary({ date: today, raw: rawAccumulated.value, formatted: formattedContent.value, todos: todos.value })
+}
+
+// ── Streaming ──────────────────────────────────────────
+
 async function runStream(rawToSend, prevRaw) {
   const apiKey = getApiKey()
   if (!apiKey) {

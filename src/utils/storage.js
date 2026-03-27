@@ -30,8 +30,15 @@ export function getDiary(date) {
   }
 }
 
-export function saveDiary({ date, raw, formatted }) {
-  const entry = { date, raw, formatted, updatedAt: Date.now() }
+export function saveDiary({ date, raw, formatted, todos }) {
+  const existing = getDiary(date) || {}
+  const entry = {
+    date,
+    raw,
+    formatted,
+    todos: todos !== undefined ? todos : (existing.todos || []),
+    updatedAt: Date.now(),
+  }
   localStorage.setItem(diaryKey(date), JSON.stringify(entry))
 
   // 维护 diary_index：去重 + 倒序，每次都写入保证一致性

@@ -27,6 +27,31 @@ const SYSTEM_PROMPT = `你是一个日记整理助手。用户会输入今天发
 - 如果输入内容过少，如实记录，不要发挥补充
 - 只输出日记正文，不要输出任何解释性文字、前缀或道歉`
 
+export async function extractTodos(formattedContent, apiKey) {
+  const response = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      stream: false,
+      messages: [
+        {
+          role: 'system',
+          content: '从日记内容中提取今天需要行动的待办事项。每行一条，只输出待办事项文字，不要编号、不要前缀符号、不要任何解释。如果没有明显的待办事项，返回空字符串。',
+        },
+        { role: 'user', content: formattedContent },
+      ],
+    }),
+  })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const json = await response.json()
+  const text = json.choices?.[0]?.message?.content?.trim() || ''
+  return text ? text.split('\n').map(s => s.trim()).filter(Boolean) : []
+}
+
 export async function streamDiary(rawContent, apiKey, { onChunk, onDone, onError }) {
   try {
     const response = await fetch('https://api.deepseek.com/chat/completions', {
