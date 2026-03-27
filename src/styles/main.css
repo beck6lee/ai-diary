@@ -126,7 +126,7 @@ body {
   font-weight: 700;
   letter-spacing: -.01em;
 }
-.today-view__redo {
+.today-view__header-btn {
   font-size: 14px;
   font-weight: 500;
   color: var(--color-primary);
@@ -221,6 +221,40 @@ body {
   font-size: 13px;
   margin-bottom: 12px;
   line-height: 1.55;
+}
+
+/* Raw records section */
+.today-raw-section { margin-top: 14px; }
+.today-raw-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 8px 4px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.today-raw-toggle__arrow { font-size: 10px; transition: transform .2s; }
+.today-raw-toggle__arrow--open { transform: rotate(180deg); }
+.today-raw-list { display: flex; flex-direction: column; gap: 8px; padding-bottom: 4px; }
+.today-raw-entry {
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  border-left: 3px solid var(--color-border);
+}
+.today-raw-entry__text {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
 }
 
 /* ── Bottom action bar ── */
