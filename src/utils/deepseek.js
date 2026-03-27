@@ -27,7 +27,7 @@ const SYSTEM_PROMPT = `你是一个日记整理助手。用户会输入今天发
 - 如果输入内容过少，如实记录，不要发挥补充
 - 只输出日记正文，不要输出任何解释性文字、前缀或道歉`
 
-export async function extractTodos(formattedContent, apiKey) {
+export async function extractTodos(rawContent, apiKey) {
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
     headers: {
@@ -40,9 +40,9 @@ export async function extractTodos(formattedContent, apiKey) {
       messages: [
         {
           role: 'system',
-          content: '从日记内容中提取今天需要行动的待办事项。每行一条，只输出待办事项文字，不要编号、不要前缀符号、不要任何解释。如果没有明显的待办事项，返回空字符串。',
+          content: '以下是用户今天的原始记录（口语化、碎片化，每条以【HH:MM】开头）。从中提取今天还需要行动的待办事项——如果用户在记录中明确说已经完成、已经做了，则不要提取。每行一条，只输出待办事项文字，不要编号、不要前缀符号、不要任何解释。如果没有明显的待办事项，返回空字符串。',
         },
-        { role: 'user', content: formattedContent },
+        { role: 'user', content: rawContent },
       ],
     }),
   })

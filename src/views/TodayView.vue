@@ -211,7 +211,7 @@ async function handleGenerateTodos() {
   error.value = ''
   isGeneratingTodos.value = true
   try {
-    const texts = await extractTodos(formattedContent.value, apiKey)
+    const texts = await extractTodos(rawAccumulated.value, apiKey)
     todos.value = texts.map(text => ({
       id: `${Date.now()}-${Math.random()}`,
       text,
