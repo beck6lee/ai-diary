@@ -6,7 +6,7 @@
       rows="12"
       @input="handleInput"
     />
-    <button class="btn btn--primary result__btn" @click="$emit('save')">
+    <button class="btn btn--primary result__btn" :disabled="!localFormatted.trim()" @click="$emit('save')">
       保存
     </button>
   </div>

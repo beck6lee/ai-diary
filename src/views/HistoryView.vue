@@ -19,13 +19,14 @@
 </template>
 
 <script setup>
-import { ref, onActivated } from 'vue'
+import { ref, onMounted } from 'vue'
 import { getDiaryIndex, getDiary } from '../utils/storage.js'
 
 const index = ref(getDiaryIndex())
 const expanded = ref({})
 
-onActivated(() => { index.value = getDiaryIndex() })
+// 每次切换到历史页时刷新索引（组件销毁重建，onMounted 可靠触发）
+onMounted(() => { index.value = getDiaryIndex() })
 
 function toggle(date) {
   expanded.value[date] = !expanded.value[date]
