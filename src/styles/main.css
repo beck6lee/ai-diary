@@ -248,6 +248,18 @@ body {
 }
 .today-todos__gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.today-todos__done-toggle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px 0 4px;
+  width: 100%;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .today-todos__list {
   list-style: none;
   padding: 0;

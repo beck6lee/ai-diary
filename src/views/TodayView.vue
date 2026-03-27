@@ -54,21 +54,43 @@
             :disabled="isGeneratingTodos"
             @click="handleGenerateTodos"
           >
-            {{ isGeneratingTodos ? '生成中…' : todos.length ? '重新生成' : '+ 生成待办' }}
+            {{ isGeneratingTodos ? '生成中…' : todos.length ? '更新待办' : '+ 生成待办' }}
           </button>
         </div>
 
-        <!-- todo list -->
-        <ul v-if="todos.length" class="today-todos__list">
+        <!-- pending todo list -->
+        <ul v-if="pendingTodos.length" class="today-todos__list">
           <li
-            v-for="todo in todos"
+            v-for="todo in pendingTodos"
             :key="todo.id"
             class="today-todo-item"
-            :class="{ 'today-todo-item--done': todo.done }"
-            @click="!todo.done && handleToggleTodo(todo.id)"
+            @click="handleToggleTodo(todo.id)"
           >
             <span class="today-todo-item__check">
-              <svg v-if="todo.done" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+              <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+            </span>
+            <span class="today-todo-item__text">{{ todo.text }}</span>
+          </li>
+        </ul>
+
+        <!-- done todos toggle -->
+        <button
+          v-if="doneTodos.length"
+          class="today-todos__done-toggle"
+          @click="showDoneTodos = !showDoneTodos"
+        >
+          {{ showDoneTodos ? '隐藏已完成' : `查看已完成（${doneTodos.length}）` }}
+        </button>
+
+        <!-- done todo list -->
+        <ul v-if="showDoneTodos && doneTodos.length" class="today-todos__list">
+          <li
+            v-for="todo in doneTodos"
+            :key="todo.id"
+            class="today-todo-item today-todo-item--done"
+          >
+            <span class="today-todo-item__check">
+              <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
             </span>
             <span class="today-todo-item__text">{{ todo.text }}</span>
             <span v-if="todo.doneAt" class="today-todo-item__time">{{ todo.doneAt }}</span>
@@ -132,7 +154,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { marked } from 'marked'
 import { getDiary, saveDiary, getApiKey } from '../utils/storage.js'
-import { streamDiary, extractTodos } from '../utils/deepseek.js'
+import { streamDiary, extractTodosIncremental } from '../utils/deepseek.js'
 
 function getToday() {
   return new Date().toLocaleDateString('sv-SE')
@@ -158,6 +180,10 @@ const showRaw = ref(false)
 // todos
 const todos = ref([])
 const isGeneratingTodos = ref(false)
+const showDoneTodos = ref(false)
+
+const pendingTodos = computed(() => todos.value.filter(t => !t.done))
+const doneTodos = computed(() => todos.value.filter(t => t.done))
 
 const rawEntries = computed(() =>
   rawAccumulated.value
@@ -202,28 +228,42 @@ function handleSaveEdit() {
 
 // ── Todos ──────────────────────────────────────────────
 
-async function handleGenerateTodos() {
+async function updateTodos(rawContent, isManual = false) {
   const apiKey = getApiKey()
   if (!apiKey) {
-    error.value = '请先在「设置」页填写 DeepSeek API Key'
+    if (isManual) error.value = '请先在「设置」页填写 DeepSeek API Key'
     return
   }
-  error.value = ''
+  if (isManual) error.value = ''
   isGeneratingTodos.value = true
   try {
-    const texts = await extractTodos(rawAccumulated.value, apiKey)
-    todos.value = texts.map(text => ({
-      id: `${Date.now()}-${Math.random()}`,
-      text,
-      done: false,
-      doneAt: null,
-    }))
+    const pending = todos.value.filter(t => !t.done)
+    const { add, complete } = await extractTodosIncremental(rawContent, pending, apiKey)
+
+    const now = new Date()
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+
+    complete.forEach(text => {
+      const match = todos.value.find(t => !t.done && t.text === text)
+      if (match) { match.done = true; match.doneAt = timeStr }
+    })
+
+    add.forEach(text => {
+      if (!todos.value.some(t => t.text === text)) {
+        todos.value.push({ id: `${Date.now()}-${Math.random()}`, text, done: false, doneAt: null })
+      }
+    })
+
     saveDiary({ date: today, raw: rawAccumulated.value, formatted: formattedContent.value, todos: todos.value })
   } catch (err) {
-    error.value = `生成待办失败：${err.message}`
+    if (isManual) error.value = `生成待办失败：${err.message}`
   } finally {
     isGeneratingTodos.value = false
   }
+}
+
+function handleGenerateTodos() {
+  updateTodos(rawAccumulated.value, true)
 }
 
 function handleToggleTodo(id) {
@@ -306,6 +346,7 @@ async function handleFormat() {
   newInput.value = ''
 
   await runStream(newRawEntry, prevRaw, formattedContent.value || null)
+  await updateTodos(newRawEntry)
 }
 
 async function handleReformat() {
