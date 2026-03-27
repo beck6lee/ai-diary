@@ -19,7 +19,7 @@
 
       <!-- today's diary (streaming or saved) -->
       <div v-if="formattedContent" class="today-card" :class="{ 'today-card--dimmed': cardDimmed }">
-        <pre class="today-card__text">{{ formattedContent }}<span v-if="state === 'formatting'" class="today-card__cursor"></span></pre>
+        <div class="today-card__text markdown-body" v-html="renderedContent"></div>
       </div>
     </div>
 
@@ -50,6 +50,7 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { marked } from 'marked'
 import { getDiary, saveDiary, getApiKey } from '../utils/storage.js'
 import { streamDiary } from '../utils/deepseek.js'
 
@@ -71,6 +72,14 @@ const newInput = ref('')          // what the user is typing now
 const error = ref('')
 const contentEl = ref(null)
 const cardDimmed = ref(false)    // dims card while waiting for first chunk
+
+// append block cursor during streaming, then render as markdown
+const renderedContent = computed(() => {
+  const text = state.value === 'formatting'
+    ? formattedContent.value + '▌'
+    : formattedContent.value
+  return marked.parse(text)
+})
 
 onMounted(() => {
   const existing = getDiary(today)

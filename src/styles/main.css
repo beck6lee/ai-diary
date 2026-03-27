@@ -170,30 +170,28 @@ body {
 }
 .today-card--dimmed { opacity: 0.3; }
 .today-card__text {
-  white-space: pre-wrap;
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.9;
-  color: var(--color-text);
   margin: 0;
-  word-break: break-word;
 }
 
-/* Blinking cursor during streaming */
-.today-card__cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1em;
-  background: var(--color-primary);
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  border-radius: 1px;
-  animation: cursor-blink 1s step-end infinite;
-}
-@keyframes cursor-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
+/* ── Markdown body (shared by today + history) ── */
+.markdown-body { font-size: 14px; line-height: 1.9; color: var(--color-text); word-break: break-word; }
+.markdown-body h1,.markdown-body h2,.markdown-body h3 { font-weight: 700; line-height: 1.3; margin: 1em 0 .4em; }
+.markdown-body h1 { font-size: 18px; }
+.markdown-body h2 { font-size: 16px; }
+.markdown-body h3 { font-size: 14px; }
+.markdown-body p  { margin: .5em 0; }
+.markdown-body ul,.markdown-body ol { padding-left: 1.4em; margin: .5em 0; }
+.markdown-body li { margin: .25em 0; }
+.markdown-body hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
+.markdown-body strong { font-weight: 700; }
+.markdown-body em { font-style: italic; }
+.markdown-body code { background: #F0EFF0; border-radius: 4px; padding: 1px 5px; font-size: 13px; font-family: 'SF Mono', Menlo, monospace; }
+.markdown-body pre { background: #F0EFF0; border-radius: var(--radius-sm); padding: 12px 14px; overflow-x: auto; margin: .6em 0; }
+.markdown-body pre code { background: none; padding: 0; font-size: 13px; }
+.markdown-body blockquote { border-left: 3px solid var(--color-primary); margin: .6em 0; padding: .2em .8em; color: var(--color-text-muted); }
+/* first child no top margin, last child no bottom margin */
+.markdown-body > *:first-child { margin-top: 0; }
+.markdown-body > *:last-child  { margin-bottom: 0; }
 
 /* Editable result textarea (formatted state) */
 .today-result-textarea {
@@ -335,15 +333,6 @@ body {
 .history-item__body {
   border-top: 1px solid var(--color-border);
   padding: 16px 18px;
-}
-.history-item__content {
-  white-space: pre-wrap;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 1.9;
-  color: var(--color-text);
-  margin: 0;
-  word-break: break-word;
 }
 
 

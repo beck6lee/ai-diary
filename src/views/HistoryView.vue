@@ -12,7 +12,7 @@
         <span class="history-item__arrow">▼</span>
       </button>
       <div v-if="expanded[date]" class="history-item__body">
-        <pre class="history-item__content">{{ getDiary(date)?.formatted || '内容加载失败' }}</pre>
+        <div class="markdown-body" v-html="renderDiary(date)"></div>
       </div>
     </div>
   </div>
@@ -20,12 +20,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { marked } from 'marked'
 import { getDiaryIndex, getDiary } from '../utils/storage.js'
 
 const index = ref(getDiaryIndex())
 const expanded = ref({})
 
-// 每次切换到历史页时刷新索引（组件销毁重建，onMounted 可靠触发）
 onMounted(() => { index.value = getDiaryIndex() })
 
 function toggle(date) {
@@ -35,5 +35,10 @@ function toggle(date) {
 function formatDate(dateStr) {
   const [year, month, day] = dateStr.split('-')
   return `${year}年${parseInt(month)}月${parseInt(day)}日`
+}
+
+function renderDiary(date) {
+  const content = getDiary(date)?.formatted || '内容加载失败'
+  return marked.parse(content)
 }
 </script>
