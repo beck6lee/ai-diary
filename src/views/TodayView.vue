@@ -18,7 +18,7 @@
       </div>
 
       <!-- today's diary (streaming or saved) -->
-      <div v-if="formattedContent" class="today-card">
+      <div v-if="formattedContent" class="today-card" :class="{ 'today-card--dimmed': cardDimmed }">
         <pre class="today-card__text">{{ formattedContent }}<span v-if="state === 'formatting'" class="today-card__cursor"></span></pre>
       </div>
     </div>
@@ -70,6 +70,7 @@ const formattedContent = ref('') // current formatted diary
 const newInput = ref('')          // what the user is typing now
 const error = ref('')
 const contentEl = ref(null)
+const cardDimmed = ref(false)    // dims card while waiting for first chunk
 
 onMounted(() => {
   const existing = getDiary(today)
@@ -96,11 +97,18 @@ async function handleFormat() {
   rawAccumulated.value = prevRaw + separator + newInput.value.trim()
   newInput.value = ''
   error.value = ''
-  formattedContent.value = ''
+  // keep existing content visible, just dim it while waiting
+  cardDimmed.value = true
   state.value = 'formatting'
+  let firstChunk = true
 
   await streamDiary(rawAccumulated.value, apiKey, {
     onChunk(text) {
+      if (firstChunk) {
+        firstChunk = false
+        formattedContent.value = ''  // swap out old content on first character
+        cardDimmed.value = false
+      }
       formattedContent.value += text
       // auto-scroll to bottom while streaming
       nextTick(() => {
@@ -109,12 +117,14 @@ async function handleFormat() {
     },
     onDone() {
       saveDiary({ date: today, raw: rawAccumulated.value, formatted: formattedContent.value })
+      cardDimmed.value = false
       state.value = 'idle'
     },
     onError(err) {
       error.value = `整理失败：${err.message}。请检查 API Key 或网络连接。`
       rawAccumulated.value = prevRaw                          // rollback
       formattedContent.value = getDiary(today)?.formatted || ''
+      cardDimmed.value = false
       state.value = 'idle'
     },
   })

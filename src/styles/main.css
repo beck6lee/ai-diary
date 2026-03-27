@@ -166,7 +166,9 @@ body {
   border-radius: var(--radius);
   padding: 18px;
   box-shadow: var(--shadow-sm);
+  transition: opacity 0.25s ease;
 }
+.today-card--dimmed { opacity: 0.3; }
 .today-card__text {
   white-space: pre-wrap;
   font-family: inherit;
