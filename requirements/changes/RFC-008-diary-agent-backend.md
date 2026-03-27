@@ -29,6 +29,31 @@
 
 前端不再直接调用 DeepSeek，改为调用自建后端 API。
 
+## 技术选型（已确定）
+
+| 项目 | 选型 |
+|------|------|
+| 语言/运行时 | Node.js + TypeScript |
+| 框架 | Hono |
+| 数据库 | PostgreSQL + Prisma ORM |
+| 认证 | JWT |
+| 部署 | Railway |
+| AI | DeepSeek API（服务端统一管理，用户不再需要自填 Key） |
+
+选择 Node.js 而非 Python：前后端同语言，减少上下文切换；日记 Agent 逻辑不复杂，不需要 LangChain 等 Python 框架。
+
+## 上架华为应用市场路径（已确定）
+
+```
+1. RFC-008 后端日记 Agent（Node.js + Hono）
+       ↓
+2. 用户注册 / 登录 + 日记数据迁移到服务端 PostgreSQL
+       ↓
+3. H5 前端改为调用自建后端 API（移除客户端 API Key）
+       ↓
+4. DevEco Studio 打 WebView 壳 → 上架华为应用市场
+```
+
 ## 待定问题（设计阶段解决）
 
 - 后端语言和框架：Node.js / Python？
