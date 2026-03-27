@@ -252,7 +252,7 @@ function handleToggleTodo(id) {
 
 // ── Streaming ──────────────────────────────────────────
 
-async function runStream(rawToSend, prevRaw) {
+async function runStream(rawToSend, prevRaw, existingDiary = null) {
   const apiKey = getApiKey()
   if (!apiKey) {
     error.value = '请先在「设置」页填写 DeepSeek API Key'
@@ -290,7 +290,7 @@ async function runStream(rawToSend, prevRaw) {
       cardDimmed.value = false
       state.value = 'idle'
     },
-  })
+  }, existingDiary)
 }
 
 async function handleFormat() {
@@ -300,11 +300,12 @@ async function handleFormat() {
   const timeTag = `【${hh}:${mm}】`
 
   const prevRaw = rawAccumulated.value
+  const newRawEntry = timeTag + newInput.value.trim()
   const separator = prevRaw ? '\n\n---\n\n' : ''
-  rawAccumulated.value = prevRaw + separator + timeTag + newInput.value.trim()
+  rawAccumulated.value = prevRaw + separator + newRawEntry
   newInput.value = ''
 
-  await runStream(rawAccumulated.value, prevRaw)
+  await runStream(newRawEntry, prevRaw, formattedContent.value || null)
 }
 
 async function handleReformat() {

@@ -27,6 +27,15 @@ const SYSTEM_PROMPT = `你是一个日记整理助手。用户会输入今天发
 - 如果输入内容过少，如实记录，不要发挥补充
 - 只输出日记正文，不要输出任何解释性文字、前缀或道歉`
 
+const SYSTEM_PROMPT_UPDATE = `你是一个日记整理助手。用户已有一篇今天的日记（Markdown格式），现在新增了一条原始记录，需要将新记录整合进已有日记。
+
+规则：
+- 将新记录内容整合到最合适的章节（今日工作 / 想法·灵感 / 知识碎片 / 复盘）
+- 如果合适的章节不存在，在日记末尾新增该章节
+- 已有内容不要改动，不要删减，不要改写
+- 时间处理：新记录开头有【HH:MM】提交时间；如果用户在记录中明确说了时间，以用户说的为准，转24小时制，格式：\`(HH:MM)\`；无法判断时间则用提交时间
+- 只输出完整日记正文（已有内容+新增内容），不要任何解释或前缀`
+
 export async function extractTodos(rawContent, apiKey) {
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
@@ -52,8 +61,19 @@ export async function extractTodos(rawContent, apiKey) {
   return text ? text.split('\n').map(s => s.trim()).filter(Boolean) : []
 }
 
-export async function streamDiary(rawContent, apiKey, { onChunk, onDone, onError }) {
+export async function streamDiary(rawContent, apiKey, { onChunk, onDone, onError }, existingDiary = null) {
   try {
+    const isIncremental = existingDiary !== null && existingDiary.trim() !== ''
+    const messages = isIncremental
+      ? [
+          { role: 'system', content: SYSTEM_PROMPT_UPDATE },
+          { role: 'user', content: `【已有日记】\n${existingDiary}\n\n【新增记录】\n${rawContent}` },
+        ]
+      : [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: rawContent },
+        ]
+
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
@@ -63,10 +83,7 @@ export async function streamDiary(rawContent, apiKey, { onChunk, onDone, onError
       body: JSON.stringify({
         model: 'deepseek-chat',
         stream: true,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: rawContent },
-        ],
+        messages,
       }),
     })
 
