@@ -37,6 +37,7 @@ export function saveDiary({ date, raw, formatted, todos }) {
     raw,
     formatted,
     todos: todos !== undefined ? todos : (existing.todos || []),
+    createdAt: existing.createdAt || Date.now(),
     updatedAt: Date.now(),
   }
   localStorage.setItem(diaryKey(date), JSON.stringify(entry))

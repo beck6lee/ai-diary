@@ -19,14 +19,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onActivated } from 'vue'
 import { marked } from 'marked'
 import { getDiaryIndex, getDiary } from '../utils/storage.js'
 
 const index = ref(getDiaryIndex())
 const expanded = ref({})
 
-onMounted(() => { index.value = getDiaryIndex() })
+// 切换到历史页时刷新，确保 TodayView 新增的日记能立即显示
+onActivated(() => { index.value = getDiaryIndex() })
 
 function toggle(date) {
   expanded.value[date] = !expanded.value[date]

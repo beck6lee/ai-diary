@@ -10,6 +10,7 @@
         class="settings-input"
         placeholder="sk-xxxxxxxxxxxxxxxx"
         @blur="handleSave"
+        @change="handleSave"
       />
       <p class="settings-hint">Key 保存在本地，不会上传到任何服务器。</p>
     </section>

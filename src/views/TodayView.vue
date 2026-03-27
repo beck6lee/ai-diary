@@ -156,8 +156,15 @@ import { marked } from 'marked'
 import { getDiary, saveDiary, getApiKey } from '../utils/storage.js'
 import { streamDiary, extractTodosIncremental } from '../utils/deepseek.js'
 
+// ✅ 已完成 section 标题，统一管理避免多处硬编码
+const DONE_SECTION = '## ✅ 已完成'
+
 function getToday() {
   return new Date().toLocaleDateString('sv-SE')
+}
+
+function formatHHMM(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 const today = getToday()
@@ -222,8 +229,10 @@ function handleCancelEdit() {
 
 function handleSaveEdit() {
   formattedContent.value = editedContent.value
-  saveDiary({ date: today, raw: rawAccumulated.value, formatted: editedContent.value })
+  saveDiary({ date: today, raw: rawAccumulated.value, formatted: editedContent.value, todos: todos.value })
   state.value = 'idle'
+  // 内容变更后静默更新 todos
+  updateTodos(rawAccumulated.value)
 }
 
 // ── Todos ──────────────────────────────────────────────
@@ -240,8 +249,7 @@ async function updateTodos(rawContent, isManual = false) {
     const pending = todos.value.filter(t => !t.done)
     const { add, complete } = await extractTodosIncremental(rawContent, pending, apiKey)
 
-    const now = new Date()
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const timeStr = formatHHMM(new Date())
 
     complete.forEach(text => {
       const match = todos.value.find(t => !t.done && t.text === text)
@@ -270,21 +278,28 @@ function handleToggleTodo(id) {
   const todo = todos.value.find(t => t.id === id)
   if (!todo || todo.done) return
 
-  const now = new Date()
-  const hh = String(now.getHours()).padStart(2, '0')
-  const mm = String(now.getMinutes()).padStart(2, '0')
-  const timeStr = `${hh}:${mm}`
-
+  const timeStr = formatHHMM(new Date())
   todo.done = true
   todo.doneAt = timeStr
 
-  // append completion note to diary
-  const SECTION = '## ✅ 已完成'
+  // 将完成条目插入 DONE_SECTION。
+  // DONE_SECTION 由本函数负责创建并始终在文档末尾，所以直接追加到末尾即可。
   const line = `- (${timeStr}) ${todo.text}`
-  if (formattedContent.value.includes(SECTION)) {
-    formattedContent.value = formattedContent.value.trimEnd() + `\n${line}`
+  const sectionIdx = formattedContent.value.lastIndexOf(DONE_SECTION)
+  if (sectionIdx !== -1) {
+    // section 已存在：找到 section 后的下一个 ## 标题，在其之前插入；否则追加到末尾
+    const afterSection = formattedContent.value.slice(sectionIdx + DONE_SECTION.length)
+    const nextHeading = afterSection.match(/\n##\s/)
+    if (nextHeading) {
+      const insertAt = sectionIdx + DONE_SECTION.length + nextHeading.index
+      formattedContent.value =
+        formattedContent.value.slice(0, insertAt).trimEnd() + `\n${line}` +
+        formattedContent.value.slice(insertAt)
+    } else {
+      formattedContent.value = formattedContent.value.trimEnd() + `\n${line}`
+    }
   } else {
-    formattedContent.value = formattedContent.value.trimEnd() + `\n\n${SECTION}\n${line}`
+    formattedContent.value = formattedContent.value.trimEnd() + `\n\n${DONE_SECTION}\n${line}`
   }
 
   saveDiary({ date: today, raw: rawAccumulated.value, formatted: formattedContent.value, todos: todos.value })
@@ -292,11 +307,12 @@ function handleToggleTodo(id) {
 
 // ── Streaming ──────────────────────────────────────────
 
-async function runStream(rawToSend, prevRaw, existingDiary = null) {
+async function runStream(rawToSend, prevRaw, existingDiary = null, prevInput = '') {
   const apiKey = getApiKey()
   if (!apiKey) {
     error.value = '请先在「设置」页填写 DeepSeek API Key'
     rawAccumulated.value = prevRaw
+    newInput.value = prevInput
     state.value = 'idle'
     return
   }
@@ -319,13 +335,14 @@ async function runStream(rawToSend, prevRaw, existingDiary = null) {
       })
     },
     onDone() {
-      saveDiary({ date: today, raw: rawAccumulated.value, formatted: formattedContent.value })
+      saveDiary({ date: today, raw: rawAccumulated.value, formatted: formattedContent.value, todos: todos.value })
       cardDimmed.value = false
       state.value = 'idle'
     },
     onError(err) {
       error.value = `整理失败：${err.message}。请检查 API Key 或网络连接。`
       rawAccumulated.value = prevRaw
+      newInput.value = prevInput  // 恢复用户输入，避免内容丢失
       formattedContent.value = getDiary(today)?.formatted || ''
       cardDimmed.value = false
       state.value = 'idle'
@@ -334,19 +351,20 @@ async function runStream(rawToSend, prevRaw, existingDiary = null) {
 }
 
 async function handleFormat() {
-  const now = new Date()
-  const hh = String(now.getHours()).padStart(2, '0')
-  const mm = String(now.getMinutes()).padStart(2, '0')
-  const timeTag = `【${hh}:${mm}】`
+  if (state.value !== 'idle') return  // 防重入
+
+  const inputText = newInput.value.trim()
+  const timeTag = `【${formatHHMM(new Date())}】`
 
   const prevRaw = rawAccumulated.value
-  const newRawEntry = timeTag + newInput.value.trim()
+  const newRawEntry = timeTag + inputText
   const separator = prevRaw ? '\n\n---\n\n' : ''
   rawAccumulated.value = prevRaw + separator + newRawEntry
   newInput.value = ''
 
-  await runStream(newRawEntry, prevRaw, formattedContent.value || null)
-  await updateTodos(newRawEntry)
+  await runStream(newRawEntry, prevRaw, formattedContent.value || null, inputText)
+  // 整理完成后用全量 raw 增量更新 todos（让 AI 有完整上下文判断完成情况）
+  await updateTodos(rawAccumulated.value)
 }
 
 async function handleReformat() {

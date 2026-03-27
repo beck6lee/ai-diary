@@ -1,6 +1,8 @@
 <template>
   <div class="app">
-    <component :is="currentView" />
+    <KeepAlive>
+      <component :is="currentView" />
+    </KeepAlive>
     <NavBar :activeTab="currentTab" @change="currentTab = $event" />
   </div>
 </template>

@@ -1,3 +1,6 @@
+const API_URL = 'https://api.deepseek.com/chat/completions'
+const MODEL = 'deepseek-chat'
+
 const SYSTEM_PROMPT = `你是一个日记整理助手。用户会输入今天发生的事情（口语化、碎片化），
 你需要将其整理成结构化的日记，使用以下 Markdown 格式：
 
@@ -46,11 +49,11 @@ export async function extractTodosIncremental(rawContent, pendingTodos, apiKey) 
     ? `【日记记录】\n${rawContent}\n\n【当前待办】\n${pendingTodos.map(t => `- ${t.text}`).join('\n')}`
     : rawContent
 
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
+  const response = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: 'deepseek-chat',
+      model: MODEL,
       stream: false,
       messages: [
         { role: 'system', content: sysMsg },
@@ -73,31 +76,6 @@ export async function extractTodosIncremental(rawContent, pendingTodos, apiKey) 
   }
 }
 
-export async function extractTodos(rawContent, apiKey) {
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      stream: false,
-      messages: [
-        {
-          role: 'system',
-          content: '以下是用户今天的原始记录（口语化、碎片化，每条以【HH:MM】开头）。从中提取今天还需要行动的待办事项——如果用户在记录中明确说已经完成、已经做了，则不要提取。每行一条，只输出待办事项文字，不要编号、不要前缀符号、不要任何解释。如果没有明显的待办事项，返回空字符串。',
-        },
-        { role: 'user', content: rawContent },
-      ],
-    }),
-  })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const json = await response.json()
-  const text = json.choices?.[0]?.message?.content?.trim() || ''
-  return text ? text.split('\n').map(s => s.trim()).filter(Boolean) : []
-}
-
 export async function streamDiary(rawContent, apiKey, { onChunk, onDone, onError }, existingDiary = null) {
   try {
     const isIncremental = existingDiary !== null && existingDiary.trim() !== ''
@@ -111,22 +89,21 @@ export async function streamDiary(rawContent, apiKey, { onChunk, onDone, onError
           { role: 'user', content: rawContent },
         ]
 
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
+    const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: MODEL,
         stream: true,
         messages,
       }),
     })
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    if (!response.body) throw new Error('响应体为空')
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()

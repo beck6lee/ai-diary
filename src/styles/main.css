@@ -22,7 +22,7 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
-  overflow: hidden;
+  overflow: hidden; /* 防止移动端双滚动条和 rubber-band 滚动，滚动交给各 .view 区域处理 */
   height: 100dvh;
 }
 
