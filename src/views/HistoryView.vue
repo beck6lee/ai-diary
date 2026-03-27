@@ -6,10 +6,10 @@
       还没有日记，去今日页记录第一篇吧。
     </div>
 
-    <div v-for="date in index" :key="date" class="history-item">
+    <div v-for="date in index" :key="date" class="history-item" :class="{ 'history-item--open': expanded[date] }">
       <button class="history-item__header" @click="toggle(date)">
         <span class="history-item__date">{{ formatDate(date) }}</span>
-        <span class="history-item__arrow">{{ expanded[date] ? '▲' : '▼' }}</span>
+        <span class="history-item__arrow">▼</span>
       </button>
       <div v-if="expanded[date]" class="history-item__body">
         <pre class="history-item__content">{{ getDiary(date)?.formatted || '内容加载失败' }}</pre>
