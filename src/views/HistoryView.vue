@@ -12,7 +12,7 @@
         <span class="history-item__arrow">{{ expanded[date] ? '▲' : '▼' }}</span>
       </button>
       <div v-if="expanded[date]" class="history-item__body">
-        <pre class="history-item__content">{{ getDiary(date)?.formatted }}</pre>
+        <pre class="history-item__content">{{ getDiary(date)?.formatted || '内容加载失败' }}</pre>
       </div>
     </div>
   </div>
@@ -32,7 +32,7 @@ function toggle(date) {
 }
 
 function formatDate(dateStr) {
-  const d = new Date(dateStr)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+  const [year, month, day] = dateStr.split('-')
+  return `${year}年${parseInt(month)}月${parseInt(day)}日`
 }
 </script>
