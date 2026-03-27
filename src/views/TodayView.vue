@@ -3,56 +3,39 @@
     <!-- header -->
     <div class="today-view__header">
       <span class="today-view__date">{{ todayLabel }}</span>
-      <button v-if="state === 'saved'" class="today-view__redo" @click="handleRedo">
-        重新整理
-      </button>
     </div>
 
     <!-- scrollable content area -->
-    <div class="today-view__content">
+    <div class="today-view__content" ref="contentEl">
       <!-- error -->
       <div v-if="error" class="today-error">{{ error }}</div>
 
-      <!-- empty hint (editing, no text yet) -->
-      <div v-if="state === 'editing' && !rawContent" class="today-empty">
+      <!-- empty hint -->
+      <div v-if="!formattedContent" class="today-empty">
         <div class="today-empty__icon">📖</div>
         <p class="today-empty__title">今天发生了什么？</p>
         <p class="today-empty__sub">随便写，口语化就行</p>
       </div>
 
-      <!-- streaming result -->
-      <div v-if="state === 'formatting'" class="today-card">
-        <pre class="today-card__text">{{ formattedContent }}<span class="today-card__cursor"></span></pre>
-      </div>
-
-      <!-- formatted result: editable -->
-      <textarea
-        v-if="state === 'formatted'"
-        :value="formattedContent"
-        class="today-result-textarea"
-        @input="e => (formattedContent = e.target.value)"
-      />
-
-      <!-- saved content -->
-      <div v-if="state === 'saved'" class="today-card">
-        <pre class="today-card__text">{{ saved?.formatted }}</pre>
+      <!-- today's diary (streaming or saved) -->
+      <div v-if="formattedContent" class="today-card">
+        <pre class="today-card__text">{{ formattedContent }}<span v-if="state === 'formatting'" class="today-card__cursor"></span></pre>
       </div>
     </div>
 
-    <!-- bottom action bar -->
+    <!-- bottom input bar -->
     <div class="today-view__bottom">
-      <!-- editing: input + send -->
-      <div v-if="state === 'editing'" class="today-input-bar">
+      <div v-if="state === 'idle'" class="today-input-bar">
         <textarea
-          :value="rawContent"
+          :value="newInput"
           class="today-input-bar__textarea"
-          placeholder="随便写，口语化就行…"
+          :placeholder="formattedContent ? '再记一条…' : '随便写，口语化就行…'"
           rows="2"
-          @input="handleRawInput"
+          @input="handleInputChange"
         />
         <button
           class="today-input-bar__send"
-          :disabled="!rawContent.trim()"
+          :disabled="!newInput.trim()"
           @click="handleFormat"
         >
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -60,27 +43,13 @@
           </svg>
         </button>
       </div>
-
-      <!-- formatting: loading hint -->
-      <p v-if="state === 'formatting'" class="today-loading-hint">
-        AI 整理中，请稍候…
-      </p>
-
-      <!-- formatted: save bar -->
-      <div v-if="state === 'formatted'" class="today-save-bar">
-        <button class="btn btn--secondary" @click="handleReformat">重新输入</button>
-        <button
-          class="btn btn--primary"
-          :disabled="!formattedContent.trim()"
-          @click="handleSave"
-        >保存日记</button>
-      </div>
+      <p v-if="state === 'formatting'" class="today-loading-hint">AI 整理中，请稍候…</p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { getDiary, saveDiary, getApiKey } from '../utils/storage.js'
 import { streamDiary } from '../utils/deepseek.js'
 
@@ -94,35 +63,24 @@ const todayLabel = computed(() => {
   return `${Number(m)}月${Number(d)}日`
 })
 
-const state = ref('editing')
-const rawContent = ref('')
-const formattedContent = ref('')
-const saved = ref(null)
+// state: 'idle' | 'formatting'
+const state = ref('idle')
+const rawAccumulated = ref('')   // all raw text for today (appended each time)
+const formattedContent = ref('') // current formatted diary
+const newInput = ref('')          // what the user is typing now
 const error = ref('')
+const contentEl = ref(null)
 
 onMounted(() => {
   const existing = getDiary(today)
   if (existing) {
-    saved.value = existing
-    state.value = 'saved'
+    rawAccumulated.value = existing.raw || ''
+    formattedContent.value = existing.formatted || ''
   }
 })
 
-function handleRawInput(e) {
-  rawContent.value = e.target.value
-}
-
-function handleRedo() {
-  rawContent.value = saved.value?.raw || ''
-  formattedContent.value = ''
-  error.value = ''
-  state.value = 'editing'
-}
-
-function handleReformat() {
-  formattedContent.value = ''
-  error.value = ''
-  state.value = 'editing'
+function handleInputChange(e) {
+  newInput.value = e.target.value
 }
 
 async function handleFormat() {
@@ -131,24 +89,34 @@ async function handleFormat() {
     error.value = '请先在「设置」页填写 DeepSeek API Key'
     return
   }
+
+  // append new input to accumulated raw (separated by --- on new lines)
+  const prevRaw = rawAccumulated.value
+  const separator = prevRaw ? '\n\n---\n\n' : ''
+  rawAccumulated.value = prevRaw + separator + newInput.value.trim()
+  newInput.value = ''
   error.value = ''
   formattedContent.value = ''
   state.value = 'formatting'
 
-  await streamDiary(rawContent.value, apiKey, {
-    onChunk(text) { formattedContent.value += text },
-    onDone() { state.value = 'formatted' },
+  await streamDiary(rawAccumulated.value, apiKey, {
+    onChunk(text) {
+      formattedContent.value += text
+      // auto-scroll to bottom while streaming
+      nextTick(() => {
+        if (contentEl.value) contentEl.value.scrollTop = contentEl.value.scrollHeight
+      })
+    },
+    onDone() {
+      saveDiary({ date: today, raw: rawAccumulated.value, formatted: formattedContent.value })
+      state.value = 'idle'
+    },
     onError(err) {
       error.value = `整理失败：${err.message}。请检查 API Key 或网络连接。`
-      formattedContent.value = ''
-      state.value = 'editing'
+      rawAccumulated.value = prevRaw                          // rollback
+      formattedContent.value = getDiary(today)?.formatted || ''
+      state.value = 'idle'
     },
   })
-}
-
-function handleSave() {
-  saveDiary({ date: today, raw: rawContent.value, formatted: formattedContent.value })
-  saved.value = getDiary(today)
-  state.value = 'saved'
 }
 </script>
