@@ -100,10 +100,16 @@ async function handleFormat() {
     return
   }
 
+  // capture submission time and prepend to entry
+  const now = new Date()
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const timeTag = `【${hh}:${mm}】`
+
   // append new input to accumulated raw (separated by --- on new lines)
   const prevRaw = rawAccumulated.value
   const separator = prevRaw ? '\n\n---\n\n' : ''
-  rawAccumulated.value = prevRaw + separator + newInput.value.trim()
+  rawAccumulated.value = prevRaw + separator + timeTag + newInput.value.trim()
   newInput.value = ''
   error.value = ''
   // keep existing content visible, just dim it while waiting
